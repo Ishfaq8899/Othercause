@@ -1,102 +1,74 @@
-#############################
-# Load necessary libraries
-#library(dplyr)
-#library(tidyr)
-#library(devtools)
-
-#' Filter MCED cancer data for selected cancer types
+#' Filter Data for Multiple Cancer Sites
 #'
-#' This function filters the input MCED cancer data to include only the cancer types
-#' specified in the `cancer_sites` vector. It uses the `filter` function from `dplyr`
-#' to select rows where the cancer type matches any of the types listed in `cancer_sites`.
+#' Filters a dataset to include only records for specified cancer sites.
 #'
-#' @param data A data frame containing MCED cancer mortality data. This data frame should
-#'             include a column named `ICD-10 113 Cause List` which specifies the cancer types.
-#' @param cancer_sites A vector of selected cancer type names to filter. These names
-#'                     should match the values in the `ICD-10 113 Cause List` column of the data frame.
+#' @param data A data frame containing cancer data with a 'cancer_site' column.
+#' @param cancer_sites A character vector of cancer site names to filter for.
 #'
-#' @return A data frame containing only rows where cancer type is in `cancer_sites`.
-#' @export
+#' @return A filtered data frame containing only records where cancer_site
+#'   matches one of the specified sites.
+#'
 #' @examples
-#' selected_cancers <- c(
-#' "Malignant neoplasm of prostate (C61)",
-#' "Malignant neoplasm of bladder (C67)"
+#' \dontrun{
+#' # Filter for lung and breast cancers
+#' filtered_data <- filter_multiple_cancers(
+#'   data = cancer_data,
+#'   cancer_sites = c("Lung", "Breast")
 #' )
-#' filtered_data <- filter_multiple_cancers(MCED_cdc, selected_cancers)
+#' }
 #'
-#'
-#'
-#'
+#' @export
+#' @importFrom dplyr filter
 filter_multiple_cancers <- function(data, cancer_sites) {
   filtered_data <-  data %>%
     filter(cancer_site %in% cancer_sites)
   return(filtered_data)
 }
-#' Adjust all-cause mortality to estimate other-cause mortality rates
+
+#' Calculate Other-Cause Mortality Rates
 #'
 #' This function calculates mortality rates for causes other than the selected (MCED) cancers.
-#' All cause and cause-specific (MCED) death rates for 2018-2022 were obtained from CDC (Centers
-#' for Disease Control and Prevention 2025) and HMD (Human Mortality Database 2025) by age and gender.
 #'
-#' The function performs several steps:
+#' @param all_cause_data A data frame containing all-cause mortality data with
+#'   columns: Notes, Age, Gender, Year, Deaths, Population, all_crude_Rate.
+#' @param MCED_cause_data A data frame containing MCED cancer-specific mortality
+#'   data with columns: Year, Age, Gender, cancer_site, Deaths, Population.
+#' @param selected_cancers A character vector specifying which cancer sites to
+#'   include in the MCED calculation.
 #'
-#' 1. Filters the MCED cancer data for the selected cancers.
-#' 2. Converts HMD data to a long format for easier processing.
-#' 3. Process all cause CDC and HMD data to generate all cause death rates
-#' 4. Convert all-cause death rates to probabilities using formula of Rosenberg (2006).
-#' 5. Process MCED CDC and HMD cancer data to generate MCED cancer death rates
-#' 6. Convert MCED cancer death rates to probabilities using formula of Rosenberg (2006).
-#' 7. Compute probability of death from causes other than MCED cancers
-#' 8. Convert other cause death probabilities to rates using inverse formula of Rosenberg (2006).
+#' @return A data frame with other-cause death rates containing columns:
+#'   age, sex, year, other_cause_rate.
 #'
+#' @details
+#' The function performs the following steps:
+#' \itemize{
+#'   \item Filters MCED cancer data for selected cancer sites
+#'   \item Converts all cause and MCED cancer-specific central death rates to probabilities using the formula
+#'         of Rosenberg (2006)
+#'   \item Calculates other-cause death probability as the difference
+#'   \item Convert other cause death probabilities to rates using inverse formula of Rosenberg (2006).
+#' }
 #'
-#' @param cdc_data A data frame with all-cause mortality data from the CDC. This data frame should
-#'                      include columns: "Single-Year Ages Code", "Gender", "Year", "Deaths", "Population", "Crude Rate".
-#' @param MCED_cdc A data frame with cancer-specific mortality data from the CDC. This data frame should
-#'                 include columns: "Single-Year Ages Code", "Sex", "Year", "ICD-10 113 Cause List",
-#'                 "ICD-10 113 Cause List Code", "Deaths", "Population", "Crude Rate".
-#' @param hmd_data A data frame with population data from HMD. This data frame should include columns:
-#'                 "Year", "Age", "Female", "Male", "Total".
-#' @param selected_cancers A character vector specifying the cancer types to analyze.
-#'  These names include: "Bladder","Breast","Colorectal", "Esophagus","Gastric", "Headandneck",
-#'  "Liver", "Lung","Ovary", "Pancreas", "Prostate", "Renal", "Uterine"
-#'
-#' @return A data frame with age-specific and sex-specific mortality rates due to causes
-#'         other than the selected cancers. Includes columns: age, sex, year, other_cause_rate.
-#' @export
 #' @examples
-#' cdc_data <- read.csv("all_cause_cdc.csv")
-#' MCED_cdc <- read.csv("MCED_cdc.csv")
-#' hmd_data <- read.csv("hmd_data.csv")
-#' selected_cancers <- c(
-#' "Prostate",
-#' "Bladder"
+#' \dontrun{
+#' other_rates <- get_other_cause_mortality(
+#'   all_cause_data = mortality_data,
+#'   MCED_cause_data = cancer_data,
+#'   selected_cancers = c("Lung", "Colorectal", "Breast")
 #' )
-#' get_other_cause_mortality <- adjusted_all_cause_mortality(cdc_data, MCED_cdc, hmd_data, selected_cancers)
-get_other_cause_mortality <- function(cdc_data, MCED_cdc, hmd_data, selected_cancers) {
+#' }
+#'
+#' @export
+#' @importFrom dplyr filter select mutate rename group_by summarize left_join if_else first
+#' @importFrom magrittr %>%
+get_other_cause_mortality <- function(all_cause_data, MCED_cause_data, selected_cancers) {
 
-  # Filter the MCED data for the selected cancers
-  filtered_cancer_data <- filter_multiple_cancers(data = MCED_cdc, cancer_sites = selected_cancers)
+  # Filter MCED cancers
+  filtered_cancer_data <- filter_multiple_cancers(data = MCED_cause_data, cancer_sites = selected_cancers)
 
-  # Convert HMD data to long format for easier processing
-  hmd_data_long <- hmd_data %>%
-    pivot_longer(cols = c(Female, Male), names_to = "Gender", values_to = "Population") %>%
-    filter(Year %in% 2018:2022) %>%
-    select(Year, Age, Gender, Population) %>%
-    mutate(Age = as.numeric(Age))
-
-  # Process all cause CDC and HMD data to generate all cause death rates
-  all_cause_death_rate <- cdc_data %>%
-    rename(Age = `Single-Year Ages Code`) %>%
-    rename(all_crude_Rate = `Crude Rate`) %>%
-    select(Notes, Age, Gender, Year, Deaths, Population, all_crude_Rate)
-  # %>% filter(!is.na(all_crude_Rate), !is.na(Gender), !is.na(Year))
-
-
-  all_cause_death_rate<- all_cause_death_rate %>%
-    left_join(hmd_data_long %>% filter(Age > 84), by = c("Year", "Age", "Gender"), suffix = c("", "_hmd")) %>%
-    mutate(Population = ifelse(is.na(Population), Population_hmd, Population)) %>%
-    select(-Population_hmd) %>%
+  # Adjust all-cause crude rate for ages > 84 using merged population
+  all_cause_death_rate <- all_cause_data %>%
+    select(Notes, Age, Gender, Year, Deaths, Population, all_crude_Rate) %>%
     mutate(all_crude_Rate = ifelse(Age > 84, (Deaths / Population) * 100000, all_crude_Rate)) %>%
     rename(sex = Gender, age = Age, year = Year) %>%
     mutate(Type = "All-cause death rates") %>%
@@ -107,15 +79,10 @@ get_other_cause_mortality <- function(cdc_data, MCED_cdc, hmd_data, selected_can
     mutate(all_death_probability = (all_crude_Rate / 100000) / (1 + 0.5 * all_crude_Rate / 100000)) %>%
     mutate(Type = "All-cause death probability")
 
-  # Process MCED CDC and HMD cancer data to generate MCED cancer death rates
+  # Process MCED cancer death rates
   MCED_cancer_death_rate <- filtered_cancer_data %>%
-    rename(Age = `Single-Year Ages Code`, Gender = Sex) %>%
     select(Year, Age, Gender, cancer_site, Deaths, Population) %>%
-    left_join(hmd_data_long %>% filter(Age > 84), by = c("Year", "Age", "Gender"), suffix = c("", "_hmd")) %>%
-    mutate(Population = ifelse(is.na(Population), Population_hmd, Population)) %>%
-    select(-Population_hmd) %>%
-    mutate(crude_Rate =  (Deaths / Population) * 100000) %>%
-    mutate(crude_Rate = as.numeric(crude_Rate)) %>%
+    mutate(crude_Rate = (Deaths / Population) * 100000) %>%
     rename(sex = Gender, age = Age, year = Year) %>%
     group_by(year, age, sex) %>%
     summarize(
@@ -131,8 +98,7 @@ get_other_cause_mortality <- function(cdc_data, MCED_cdc, hmd_data, selected_can
     mutate(MCED_death_probability = (MCED_crude_Rate / 100000) / (1 + 0.5 * all_crude_Rate / 100000)) %>%
     select(age, sex, year, all_crude_Rate, MCED_crude_Rate, MCED_death_probability)
 
-
-  # Compute probability of death from causes other than MCED cancers
+  # Compute probability of death from other causes
   other_cause_death_probability <- all_cause_death_probability %>%
     left_join(MCED_cause_death_probability %>% select(year, age, sex, MCED_death_probability), by = c("year", "age", "sex")) %>%
     mutate(other_cause_probability = if_else(is.na(MCED_death_probability),
@@ -141,8 +107,7 @@ get_other_cause_mortality <- function(cdc_data, MCED_cdc, hmd_data, selected_can
     select(age, sex, year, all_death_probability, MCED_death_probability, other_cause_probability) %>%
     mutate(Type = "Other-cause death probability")
 
-
-  # Convert other cause death probabilities to rates
+  # Convert other-cause probabilities to rates
   other_cause_death_rate <- other_cause_death_probability %>%
     mutate(other_cause_rate = (other_cause_probability / (1 - 0.5 * other_cause_probability)) * 100000) %>%
     select(age, sex, year, other_cause_rate) %>%
@@ -151,45 +116,50 @@ get_other_cause_mortality <- function(cdc_data, MCED_cdc, hmd_data, selected_can
   return(other_cause_death_rate)
 }
 
-#################################################
-#' Create a table of other-cause death survival probabilities
+#' Create Other-Cause Death Survival Table
 #'
-#' This function generates a table of survival probabilities for causes other than selected (MCED) cancers.
-#' Its uses the output from the `get_other_cause_mortality` function and filters it based on the specified
-#' sex, year, and starting age.
+#' Generates a survival table for other-cause mortality (non-MCED cancers) for
+#' a specific sex, year, and starting age, including cumulative survival probabilities.
 #'
-#' @param cdc_data A data frame with all-cause mortality data from the CDC. This data frame should
-#'                      include columns: "Single-Year Ages Code", "Gender", "Year", "Deaths", "Population",
-#'                      "Crude Rate".
-#' @param MCED_cdc A data frame with cancer-specific mortality data from the CDC. This data frame should
-#'                    include columns: "Single-Year Ages Code", "Sex", "Year", "ICD-10 113 Cause List",
-#'                    "ICD-10 113 Cause List Code", "Deaths", "Population", "Crude Rate".
-#' @param hmd_data A data frame with population data from HMD. This data frame should include columns:
-#'                  "Year", "Age", "Female", "Male", "Total".
-#' @param selected_cancers A character vector specifying the cancer types to analyze.
-#'                         These names include: "Anus", "Bladder", "Breast", "Colorectal", "Esophagus", "Gastric",
-#'                         "Headandneck", "Liver", "Lung", "Ovary", "Pancreas", "Prostate", "Renal", "Uterine".
+#' @param all_cause_data A data frame containing all-cause mortality data.
+#' @param MCED_cause_data A data frame containing MCED cancer-specific mortality data.
+#' @param selected_cancers A character vector of cancer sites to include in MCED calculations.
+#' @param the_sex A character string specifying the sex ("Male" or "Female").
+#' @param the_year A numeric value specifying the year.
+#' @param the_starting_age A numeric value specifying the starting age for survival calculations.
 #'
+#' @return A data frame containing survival probabilities with columns:
+#'   age, sex, year, other_cause_rate, Type, surv.
 #'
-#' @param the_sex  A character string specifying the sex to filter by ("Male" or "Female").
-#' @param the_year An integer specoifying the year to filter by.
-#' @param the_starting_age An integer specifying the starting age for the survival probabilities.
+#' @details
+#' This function:
+#' \itemize{
+#'   \item Calls \code{get_other_cause_mortality} to get other-cause death rates
+#'   \item Filters for the specified sex and year
+#'   \item Calculates cumulative survival probabilities using \code{cumprod}
+#'   \item Normalizes survival to 1.0 at the starting age
+#' }
 #'
-#' @return A data frame with survival probabilities for causes other than the selected cancers.
-#'         Includes columns: age, sex, year, other_cause_rate, surv.
-#' @export
 #' @examples
-#' cdc_data <- read_excel("/path/to/cdc_all_cause_2018_2022.xlsx")
-#' MCED_cdc <- read_excel("/path/to/modified_MCED_data.xlsx")
-#' hmd_data <- read_excel("/path/to/hmd_population_1933_2023.xlsx")
-#' selected_cancers <- c("Anus", "Bladder", "Breast", "Colorectal", "Esophagus", "Gastric", "Headandneck",
-#'                       "Liver", "Lung", "Ovary", "Pancreas", "Prostate", "Renal", "Uterine")
-#' othercause_surv <- make_othercause_death_table(cdc_data, MCED_cdc, hmd_data, selected_cancers, "Female", 2019, 60)
-make_othercause_death_table <- function(cdc_data, MCED_cdc, hmd_data, selected_cancers,
+#' \dontrun{
+#' surv_table <- make_othercause_death_table(
+#'   all_cause_data = mortality_data,
+#'   MCED_cause_data = cancer_data,
+#'   selected_cancers = c("Lung", "Breast"),
+#'   the_sex = "Female",
+#'   the_year = 2020,
+#'   the_starting_age = 50
+#' )
+#' }
+#'
+#' @export
+#' @importFrom dplyr filter mutate
+#' @importFrom magrittr %>%
+make_othercause_death_table <- function(all_cause_data, MCED_cause_data, selected_cancers,
                                         the_sex, the_year, the_starting_age) {
 
-  othercause_surv=get_other_cause_mortality(cdc_data = cdc_data, MCED_cdc = MCED_cdc,
-                                            hmd_data = hmd_data, selected_cancers = selected_cancers) %>%
+  othercause_surv=get_other_cause_mortality(all_cause_data = all_cause_data, MCED_cause_data = MCED_cause_data,
+                                            selected_cancers = selected_cancers) %>%
     filter(sex == the_sex, year == the_year)%>%
     mutate(surv=cumprod(1-other_cause_rate/100000))%>%
     mutate(surv=ifelse(age<=the_starting_age, 1, surv/surv[age==the_starting_age]))
@@ -198,21 +168,28 @@ make_othercause_death_table <- function(cdc_data, MCED_cdc, hmd_data, selected_c
 
 }
 
-#' Simulate other-cause death time
+#' Simulate Other-Cause Death Time
 #'
-#' This function simulates the time to death from causes other than the selected (MCED) cancers
-#' using the survival probabilities from the `make_othercause_death_table` function.
+#' Simulates the time to death from other causes (non-MCED cancers) based on
+#' a survival table, with optional seed setting for reproducibility.
 #'
-#' @param othercause_death_table A data frame with survival probabilities for causes other than the selected cancers.
-#'                               Includes columns: age, sex, year, other_cause_rate, surv.
-#' @param ID optional ID to set random seed.
+#' @param othercause_death_table A data frame containing survival data with
+#'   columns 'age' and 'surv', typically output from \code{make_othercause_death_table}.
+#' @param ID A numeric value used as a seed for random number generation.
 #'
 #' @return A numeric value representing the simulated time to death from other causes.
-#' @export
+#'
 #' @examples
-#' othercause_death_table <- make_othercause_death_table(cdc_data, MCED_cdc, hmd_data, selected_cancers, "Female", 2019, 60)
-#' sim_time <- sim_othercause_death(othercause_death_table)
-sim_othercause_death <- function(othercause_death_table,ID=NA) {
+#' \dontrun{
+#' # Simulate without setting seed
+#' death_time <- sim_othercause_death(survival_table)
+#'
+#' # Simulate with reproducible seed
+#' death_time <- sim_othercause_death(survival_table, ID = 123)
+#' }
+#'
+#' @export
+sim_othercause_death <- function(othercause_death_table, ID = NA) {
   if(!is.na(ID)){
     set.seed(ID)
   }
@@ -221,16 +198,3 @@ sim_othercause_death <- function(othercause_death_table,ID=NA) {
   return(the_time)
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
