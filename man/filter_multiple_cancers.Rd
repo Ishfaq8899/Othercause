@@ -27,4 +27,8 @@ selected_cancers <- c(
 "Malignant neoplasm of bladder (C67)"
 )
 filtered_data <- filter_multiple_cancers(MCED_cdc, selected_cancers)
+
+
+
+
 }

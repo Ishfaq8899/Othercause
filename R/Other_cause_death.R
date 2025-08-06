@@ -23,29 +23,15 @@
 #' "Malignant neoplasm of bladder (C67)"
 #' )
 #' filtered_data <- filter_multiple_cancers(MCED_cdc, selected_cancers)
+#'
+#'
+#'
+#'
 filter_multiple_cancers <- function(data, cancer_sites) {
-
-  filtered_data <-  data %>% mutate(cancer_site=case_when(
-    `ICD-10 113 Cause List`==   "Malignant neoplasms of anus(C21)" ~ "Anus",
-    `ICD-10 113 Cause List`== "Malignant neoplasm of bladder (C67)" ~ "Bladder",
-    `ICD-10 113 Cause List`==  "Malignant neoplasm of breast (C50)" ~ "Breast",
-    `ICD-10 113 Cause List`==   "Malignant neoplasms of colon, and rectum(C18, C19)" ~ "Colorectal",
-    `ICD-10 113 Cause List`==    "Malignant neoplasm of esophagus (C15)" ~ "Esophagus",
-    `ICD-10 113 Cause List`==   "Malignant neoplasm of stomach (C16)" ~ "Gastric",
-    `ICD-10 113 Cause List`=="Malignant neoplasms of lip, oral cavity and pharynx (C00-C14)" ~"Headandneck",
-    `ICD-10 113 Cause List`==  "Malignant neoplasms of liver and intrahepatic bile ducts (C22)" ~ "Liver",
-    `ICD-10 113 Cause List`==   "Malignant neoplasms of trachea, bronchus and lung (C33-C34)" ~ "Lung",
-    `ICD-10 113 Cause List`== "Malignant neoplasm of ovary (C56)" ~ "Ovary",
-    `ICD-10 113 Cause List`==   "Malignant neoplasm of pancreas (C25)" ~ "Pancreas",
-    `ICD-10 113 Cause List`== "Malignant neoplasm of prostate (C61)" ~ "Prostate",
-    `ICD-10 113 Cause List`== "Malignant neoplasms of kidney and renal pelvis (C64-C65)" ~ "Renal",
-    `ICD-10 113 Cause List`==  "Malignant neoplasms of corpus uteri and uterus, part unspecified (C54-C55)" ~ "Uterine",
-    .default=NA)) %>%
+  filtered_data <-  data %>%
     filter(cancer_site %in% cancer_sites)
   return(filtered_data)
 }
-
-
 #' Adjust all-cause mortality to estimate other-cause mortality rates
 #'
 #' This function calculates mortality rates for causes other than the selected (MCED) cancers.
